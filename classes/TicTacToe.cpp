@@ -1,7 +1,4 @@
 #include "TicTacToe.h"
-#include <cstdlib>
-#include <ctime>
-#include <vector>
 
 // -----------------------------------------------------------------------------
 // TicTacToe.cpp
@@ -197,43 +194,111 @@ void TicTacToe::setStateString(const std::string &s) {
 }
 
 //
+// Helper: check winner on a simulated board (0=empty, 1=player0, 2=player1)
+//
+static int checkWinnerOnBoard(int board[9]) {
+  int wins[8][3] = {
+      {0, 1, 2}, {3, 4, 5}, {6, 7, 8}, // rows
+      {0, 3, 6}, {1, 4, 7}, {2, 5, 8}, // cols
+      {0, 4, 8}, {2, 4, 6}             // diagonals
+  };
+  for (int i = 0; i < 8; i++) {
+    int a = board[wins[i][0]];
+    int b = board[wins[i][1]];
+    int c = board[wins[i][2]];
+    if (a != 0 && a == b && b == c) {
+      return a; // Return which player won (1 or 2)
+    }
+  }
+  return 0; // No winner
+}
+
+//
+// Helper: check if board is full (draw if no winner)
+//
+static bool isBoardFull(int board[9]) {
+  for (int i = 0; i < 9; i++) {
+    if (board[i] == 0)
+      return false;
+  }
+  return true;
+}
+
+//
+// Negamax on simulated board - fast, no texture loading
+// currentPlayer: 1 or 2 (matching board values)
+//
+static int negamaxBoard(int board[9], int currentPlayer) {
+  int winner = checkWinnerOnBoard(board);
+  if (winner != 0) {
+    return (winner == currentPlayer) ? 10 : -10;
+  }
+  if (isBoardFull(board)) {
+    return 0;
+  }
+
+  int bestScore = -100;
+  int opponent = (currentPlayer == 1) ? 2 : 1;
+
+  for (int i = 0; i < 9; i++) {
+    if (board[i] == 0) {
+      board[i] = currentPlayer;
+      int score = -negamaxBoard(board, opponent);
+      board[i] = 0;
+      if (score > bestScore) {
+        bestScore = score;
+      }
+    }
+  }
+  return bestScore;
+}
+
+//
 // this is the function that will be called by the AI
 //
 void TicTacToe::updateAI() {
-  // Simple random AI: pick a random empty square
   if (checkForWinner() || checkForDraw()) {
     return;
   }
 
-  // Collect all empty squares
-  std::vector<int> emptySquares;
+  // Build a simple board representation from current state
+  // 0 = empty, 1 = player 0 (X), 2 = player 1 (O)
+  int board[9];
   for (int i = 0; i < 9; i++) {
-    if (ownerAt(i) == nullptr) {
-      emptySquares.push_back(i);
+    Player *owner = ownerAt(i);
+    if (owner == nullptr) {
+      board[i] = 0;
+    } else {
+      board[i] = owner->playerNumber() + 1; // 1 for player 0, 2 for player 1
     }
   }
 
-  // If there are empty squares, pick one randomly
-  if (!emptySquares.empty()) {
-    static bool seeded = false;
-    if (!seeded) {
-      srand(static_cast<unsigned int>(time(nullptr)));
-      seeded = true;
+  int bestMove = -1;
+  int bestScore = -100;
+  int aiPlayer = getCurrentPlayer()->playerNumber();
+  int aiBoardVal = aiPlayer + 1; // 1 or 2
+  int opponentBoardVal = (aiBoardVal == 1) ? 2 : 1;
+
+  for (int i = 0; i < 9; i++) {
+    if (board[i] == 0) {
+      board[i] = aiBoardVal;
+      int score = -negamaxBoard(board, opponentBoardVal);
+      board[i] = 0;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = i;
+      }
     }
+  }
 
-    int randomIndex = rand() % emptySquares.size();
-    int chosenSquare = emptySquares[randomIndex];
-
-    int y = chosenSquare / 3;
-    int x = chosenSquare % 3;
-
-    // Place the AI's piece directly (don't use actionForEmptyHolder as it
-    // blocks AI input)
-    Bit *bit = PieceForPlayer(getCurrentPlayer()->playerNumber());
-    if (bit) {
-      bit->setPosition(_grid[y][x].getPosition());
-      _grid[y][x].setBit(bit);
-      endTurn();
-    }
+  // Make best move on actual game board
+  if (bestMove != -1) {
+    int y = bestMove / 3;
+    int x = bestMove % 3;
+    Bit *bit = PieceForPlayer(aiPlayer);
+    bit->setPosition(_grid[y][x].getPosition());
+    _grid[y][x].setBit(bit);
+    endTurn();
   }
 }

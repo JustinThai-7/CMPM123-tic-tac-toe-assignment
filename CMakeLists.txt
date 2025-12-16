@@ -59,6 +59,7 @@ add_executable(demo Application.cpp
                           classes/Sprite.cpp
                           classes/Square.cpp
                           classes/TicTacToe.cpp
+                          classes/Logger.cpp
                           ${BCKD_FILE}
                           ${MAIN_FILE}
                           ${IMPL_FILE}
